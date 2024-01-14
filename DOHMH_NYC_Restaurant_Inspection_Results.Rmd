@@ -25,6 +25,9 @@ New libraries
 ```{r}
 library(RSocrata)
 library(dplyr)
+library(tidyverse)
+library(gridExtra)
+library(conflicted)
 ```
 
 ## Get Dataset
@@ -35,9 +38,11 @@ token <- "ctZLVtoG6N0anBu9lXENnsz8S"
 df <- read.socrata("https://data.cityofnewyork.us/resource/43nn-pn8j.json", app_token = token)
 ```
 
-Save to excel file so we don't have to run the API
+
 ```{r}
-write.csv(df, "data\\DOHMH_NYC_Restuarant_Data.csv")
+#get dataset using local csv file
+#file is too large for github so it will not be uploaded to the respository
+#df <- read.csv("DOHMH_New_York_city_Restaurant_Inspection_Results.csv")
 ```
 
 
@@ -56,23 +61,23 @@ str(df)
 summary(df)
 ```
 
-Earliest inspection and most recent inspection
+Earliest inspection and most recent inspection. Active companies that have not been inspected yet all have an inspection date of 1900-01-01 EST so we will add a new column with a flag to distinguish between companies waiting for an inspection ("pending") and those who had an inspection ("complete"). 
 ```{r}
 min(df$inspection_date)
 max_date <- max(df$inspection_date)
 ```
 
-Separate companies that have an inspection date with those who are waiting.
+Two new datasets are made with the new Status flag. 209,696 companies have a completed inspection and 2,544 companies are pending. 
 ```{r}
-df <- df %>%
+df_update <- df %>%
   mutate(status = if_else(inspection_date == "1900-01-01 EST", "pending", "complete"))
 
 # companies with completed inspections
-df_complete <- df %>%
+df_complete <- df_update %>%
   filter(status == "complete")
 
 # companies pending inspection
-df_pending <- df %>%
+df_pending <- df_update %>%
   filter(status == "pending")
 
 
@@ -80,6 +85,86 @@ nrow(df_complete)
 nrow(df_pending)
 ```
 
+The complete dataframe has NA's in the Grade Data columnn but not in the Grade column. We would assume that if a company with a Grade should also have a Grade Date so this is somethign we will have to explore further. 
+```{r}
+summary(df_complete)
+```
+
+Frequency tables
+
+Boroughs
+```{r}
+#complete list
+p_boro_complete <- ggplot(df_complete, aes(x = boro)) +
+  geom_bar() + 
+  coord_flip()
+
+#pending list
+p_boro_pend <- ggplot(df_pending, aes(x = boro)) +
+  geom_bar() +
+  coord_flip()
+
+grid.arrange(p_boro_complete, p_boro_pend, ncol=2)
+
+```
+
+Cuisine Description - there are too many options so a bar plot is not useful. need another visualization
+```{r}
+#complete list
+p_boro_complete <- ggplot(df_complete, aes(x = cuisine_description)) +
+  geom_bar() + 
+  coord_flip()
+
+#pending list
+p_boro_pend <- ggplot(df_pending, aes(x = boro)) +
+  geom_bar() +
+  coord_flip()
+
+grid.arrange(p_boro_complete, p_boro_pend, ncol=2)
+
+ggplot(df_complete, aes(x = violation_code)) +
+  geom_bar() 
+```
+
+Violation code - there are too many options so a bar plot is not useful. need another visualization
+```{r}
+#complete list
+p_boro_complete <- ggplot(df_complete, aes(x = cuisine_description)) +
+  geom_bar() + 
+  coord_flip()
+
+#pending list
+p_boro_pend <- ggplot(df_pending, aes(x = boro)) +
+  geom_bar() +
+  coord_flip()
+
+grid.arrange(p_boro_complete, p_boro_pend, ncol=2)
+
+ggplot(df_complete, aes(x = violation_code)) +
+  geom_bar() 
+```
+
+
+Critical Flag - only one chart is needed since this column is only applicable to restaurants with an inspection. 
+```{r}
+ggplot(df_complete, aes(x = boro, fill = critical_flag)) +
+  geom_bar() + coord_flip()
+```
+
+Scores - violin plot after converting the scores to a numeric data type 
+```{r}
+score <- df_complete %>%
+  select(boro,score)
+
+score$score <- as.numeric(score$score)
+
+min(score$score)
+max(score$score)
+
+score %>%
+  ggplot(aes(x = boro, y = score)) +
+  geom_violin()
+```
 
 # Old Code
 
