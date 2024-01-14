@@ -1,0 +1,136 @@
+---
+title: "DOHMH New York City Restaurant Inspection Results"
+author: "LeTicia Cancel"
+date: "today()"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Update with updated data using the API https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/43nn-pn8j 
+
+Create visualization using Tableau https://support.socrata.com/hc/en-us/articles/115011744048 
+
+# Introduction
+
+This dataset is publicly available. It contains the restaurant inspection results from XX to 'max_date'. This dataset only includes active restaurants so the data will change over time. It also includes restaurants that have applied for a permit but have not yet been inspected. 
+
+New libraries
+```{r}
+library(RSocrata)
+library(dplyr)
+```
+
+## Get Dataset
+
+```{r}
+#get dataset using API
+token <- "ctZLVtoG6N0anBu9lXENnsz8S"
+df <- read.socrata("https://data.cityofnewyork.us/resource/43nn-pn8j.json", app_token = token)
+```
+
+Save to excel file so we don't have to run the API
+```{r}
+write.csv(df, "data\\DOHMH_NYC_Restuarant_Data.csv")
+```
+
+
+```{r}
+#get dataset from excel file on Github
+```
+
+## Data Exploration
+
+
+Explore the data
+```{r}
+head(df)
+nrow(df)
+str(df)
+summary(df)
+```
+
+Earliest inspection and most recent inspection
+```{r}
+min(df$inspection_date)
+max_date <- max(df$inspection_date)
+```
+
+Separate companies that have an inspection date with those who are waiting.
+```{r}
+df <- df %>%
+  mutate(status = if_else(inspection_date == "1900-01-01 EST", "pending", "complete"))
+
+# companies with completed inspections
+df_complete <- df %>%
+  filter(status == "complete")
+
+# companies pending inspection
+df_pending <- df %>%
+  filter(status == "pending")
+
+
+nrow(df_complete)
+nrow(df_pending)
+```
+
+
+# Old Code
+
+
+
+Libraries needed for analysis.
+```{r message=FALSE, warning=FALSE}
+library(sf)
+library(DBI)
+library(RCurl)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+# Data 1 - NYC Restaurant Inspection 
+
+### Get Dataset 
+
+The first data set that will be analyzed are all of the NYC Restaurant Inspection results from 2019 to 10/1/2020. The data will be pulled from a csv file that is on GitHub.
+```{r message=FALSE,warning=FALSE}
+#get URL and import data from GitHub
+site <- "https://raw.githubusercontent.com/ltcancel/Project2_Data607_F20/master/DOHMH_New_York_City_Restaurant_Inspection_Results.csv"
+df <- read_csv(url(site))
+
+head(df)
+```
+### Tidy the data/Analysis
+
+Q. How many violations were issued for restaurants in each borough for each year? 
+```{r}
+#separate date into its own columns
+df <- df %>%
+  separate('INSPECTION DATE',sep="/",into = c("month","day","year"),remove = FALSE)
+
+#not every row has a value for BORO so I want to exclude this data. I also want to include anyone who does not have a violation description
+df1Filter <- df %>% group_by(year) %>% count(BORO) %>% filter(BORO != 0 & !is.na('VIOLATION DESCRIPTION'))
+
+head(df1Filter)
+```
+
+After plotting the data, we can see that the number of violations has increased over the years. Manhattan consistently has the greatest number of violations. Brooklyn and Queens are very close, and Staten Island has the least number of violations. I think this data needs further analysis to see the percentage of restaurants with violations and the percentage of restaurants with an A grade. Manhattan may have a larger number of restaurants making their violations seem inflated when compared to the other boroughs. 
+
+```{r}
+ggplot(df1Filter) +
+  geom_bar(mapping = aes(x=BORO, y = n, fill = BORO), stat = 'identity') +
+  facet_wrap(~year) +
+  coord_flip() +
+  labs(title = "Resturant Insepction Violations",x="Borough",y="Violations")
+```
+
+
+
